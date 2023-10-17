@@ -1,0 +1,1332 @@
+## ams_version=1.0
+
+Model Main_Maximization {
+	Section INPUT_DATA {
+		DeclarationSection sets {
+			Set TimeIndex_t {
+				SubsetOf: Integers;
+				Index: tt, t;
+				Property: ElementsAreNumerical;
+				Definition: {
+					{Start_period .. End_period}
+				}
+			}
+			Parameter Start_period {
+				Range: integer;
+				Comment: "52609";
+			}
+			Parameter End_period {
+				Comment: "61368";
+			}
+			Parameter PeakPeriods {
+				IndexDomain: t;
+			}
+		}
+		DeclarationSection Input_prices {
+			Parameter Price_electricity {
+				IndexDomain: t;
+				Text: "Price electricity £/MWh";
+				Range: free;
+			}
+			Parameter Price_gas {
+				IndexDomain: t;
+				Text: "Price gas NBP £/MWth";
+				Range: nonnegative;
+			}
+			Parameter Price_carbon {
+				IndexDomain: t;
+				Text: "Price Carbon £/tCO2";
+				Range: nonnegative;
+			}
+		}
+		DeclarationSection Input_prices_scenarios {
+			Parameter Pe_LW {
+				IndexDomain: t;
+				Text: "Price electricity £/MWh";
+				Range: free;
+			}
+			Parameter Pe_ST {
+				IndexDomain: t;
+				Text: "Price electricity £/MWh";
+				Range: free;
+			}
+			Parameter Pe_CT {
+				IndexDomain: t;
+				Text: "Price electricity £/MWh";
+				Range: free;
+			}
+			Parameter Pe_SP {
+				IndexDomain: t;
+				Text: "Price electricity £/MWh";
+				Range: free;
+			}
+			Parameter Pg_BASE {
+				IndexDomain: t;
+				Text: "Price NBP £/MWh";
+				Range: nonnegative;
+			}
+			Parameter Pc_HIGH {
+				IndexDomain: t;
+				Text: "Price Carbon £/tCO2";
+				Range: nonnegative;
+			}
+			Parameter Pc_BASE {
+				IndexDomain: t;
+				Text: "Price Carbon £/tCO2";
+				Range: nonnegative;
+			}
+			Parameter Pc_LOW {
+				IndexDomain: t;
+				Text: "Price Carbon £/tCO2";
+				Range: nonnegative;
+			}
+		}
+		DeclarationSection Input_Plant {
+			Parameter PlantCapacity {
+				Text: "Gross power output (MW) = Installed capacity";
+				Range: nonnegative;
+				Definition: 1144.3;
+			}
+			Parameter Emissions_intensity {
+				Text: "Emission intensity tCO2/MWh(e) produced";
+				Range: nonnegative;
+				Definition: 0.348;
+				Comment: "emission intensity per one MWh(e) of electricity produced assuming consumtion of natural gas to produce electricity";
+			}
+			Parameter Thermal_efficiency {
+				Definition: 1/LHV;
+			}
+			Parameter LHV {
+				Text: "Net LHV% in MWe/MWth";
+				Range: nonnegative;
+				Definition: 0.52;
+			}
+			Parameter PlantVarcost {
+				Text: "Variable OPEX £/MWh";
+				Range: nonnegative;
+				Definition: 0;
+			}
+			Parameter SU {
+				Text: "Maximum ramp-up rate during start up MW/h";
+				Range: nonnegative;
+				Definition: 0.31*PlantCapacity;
+			}
+			Parameter SD {
+				Text: "Maximum ramp-down rate during shut down MW/h";
+				Range: nonnegative;
+				Definition: 0.31*PlantCapacity;
+			}
+			Parameter RU {
+				Text: "Maximum ramp-up rate when committed MW/h";
+				Range: nonnegative;
+				Definition: 3.44*PlantCapacity;
+			}
+			Parameter RD {
+				Text: "Maximum ramp-down rate when committed MW/h";
+				Range: nonnegative;
+				Definition: 3.44*PlantCapacity;
+			}
+			Parameter P_min {
+				Text: "Minimum stable generation MW/h";
+				Range: nonnegative;
+				Definition: 280;
+			}
+			Parameter P_max {
+				Text: "Maximum power output MW/h";
+				Range: nonnegative;
+				Definition: PlantCapacity;
+			}
+			Parameter UT {
+				Text: "Minimum up-time hour";
+				Range: nonnegative;
+				Definition: 4;
+			}
+			Parameter DT {
+				Text: "Minimum down-time hour";
+				Range: nonnegative;
+				Definition: 2;
+			}
+		}
+		DeclarationSection Input_UC {
+			Parameter StartupCost {
+				Text: "Startup cost £/start";
+				Range: nonnegative;
+				Definition: 54.48;
+			}
+			Parameter ShutdownCost {
+				Text: "Shutdown cost £/start";
+				Range: nonnegative;
+				Definition: 1000;
+			}
+			Parameter U_INIT {
+				Range: nonnegative;
+				Comment: "Initial condition. =1 if plant is on before modelling period. =0 otherwise";
+			}
+			Parameter Q_INIT {
+				Text: "Initial production of electricity";
+				Range: nonnegative;
+			}
+		}
+		DeclarationSection Input_CCS {
+			Parameter Cost_CO2_trans {
+				Text: "Cost of carbon transport and storage (£/tCO2)";
+				Definition: 23;
+				Comment: {
+					"According to BEIS, the estimation of this cost is variable depending on the studies.
+					High cost case is £23/tCO2, for the first plants. Central case is 19£/tCO2."
+				}
+			}
+			Parameter MaxSolventFlow {
+				Text: "Maximun flow of solvent that can be processed (m3/h/MW)";
+				Definition: 3.24;
+				Comment: "This parameter doesn\'t depend on capture rate. Only on LHV% and Emission factor of natural gas =0.18tCO2/MWh";
+			}
+			Parameter S_INIT {
+				Definition: 0;
+			}
+			Parameter SolventTankVolume {
+				Text: "Volume of tank in m3";
+				Range: nonnegative;
+				Comment: {
+					"SolventTankVolume := 3700;"
+				}
+			}
+			Parameter A {
+				Text: "Carbon captured tCO2/m3";
+				Range: nonnegative;
+				Definition: CapRate*RichLoading*44.01*0.3/61.08;
+				Comment: {
+					"Two possible calculations for A:
+					A = CapRate*RichLoading*44.01*0.3/61.08
+					In the literature, lean solvent CO2 load is varying bc CO2 is stored within the solvent. Rich loading is unchanged.
+					
+					Molar mass CO2 = 44.01g/mol
+					Molar mass MEA = 61.08 g/mol
+					%molMEA = 0.3molMEA/molSolvent"
+				}
+			}
+			Parameter CapRate {
+				Comment: "0.90 as baseline [Kong]";
+			}
+			Parameter MEA_concentration {
+				Definition: 0.3;
+			}
+			Parameter RichLoading {
+				Text: "Rich solvent loading in molCO2/molMEA";
+				Definition: 0.48;
+			}
+			Parameter LeanLoading {
+				Text: "Lean solvent loading in molCO2/molMEA";
+				Definition: (1-CapRate)*RichLoading;
+			}
+			Parameter B {
+				Text: "Electricity required to turn the dirty solvent into clean MW/m3";
+				Range: nonnegative;
+				Definition: A*(((3.7*30.924/1000)*10/(RichLoading-LeanLoading)/MEA_concentration + Heat_Absorption)*0.75*(1-298/623) +15)/44.01*1000*1000/3.6/1000000;
+				Comment: {
+					"Re-written as a function of MEA concentration and capture rate using thermodynamic formula (cf. CCS_power_penalty.xlsx)
+					B = (Reboiler heat duty * Turbine efficiency * Carnot efficiency) +15 	(in kJ/molCO2)
+						15 = Compression CO2
+					
+					
+					Reminder: 90% carbon capture = 0.03019"
+				}
+			}
+			Parameter Heat_Absorption {
+				Text: "Heat of absorption in kJ/mol";
+				Definition: 84.3;
+				Comment: "Different values in the literature";
+			}
+		}
+	}
+	Section DECISION_VARIABLES {
+		DeclarationSection Decision_variables_Plant {
+			Variable q_net {
+				IndexDomain: t;
+				Text: "Net electricity output MWh";
+				Range: nonnegative;
+			}
+			Variable u {
+				IndexDomain: t;
+				Text: "Commitment status of the plant. On=1, Off=0";
+				Range: binary;
+			}
+			Variable v {
+				IndexDomain: t;
+				Text: "Startup status, =1 if starts up,  =0 otherwise";
+				Range: binary;
+			}
+			Variable z {
+				IndexDomain: t;
+				Text: "Shut down status =1 if shuts down,=0 otherwise";
+				Range: binary;
+			}
+		}
+		DeclarationSection Decision_variables_Solvent {
+			Variable i {
+				IndexDomain: t;
+				Text: "Volume of dirty solvent m^3";
+				Range: nonnegative;
+			}
+			Variable w {
+				IndexDomain: t;
+				Text: "Volume of clean solvent m^3";
+				Range: nonnegative;
+			}
+		}
+		DeclarationSection Aux_decision_variables {
+			Variable q_gross {
+				IndexDomain: t;
+				Text: "gross electricity output MWh";
+				Range: nonnegative;
+				Definition: q_net(t)+w(t)*B;
+			}
+			Variable storage_level {
+				IndexDomain: t;
+				Range: nonnegative;
+				Definition: storage_level(t-1)$(t>1) + S_INIT$(t=1) +i(t)-w(t);
+			}
+			Variable plant_carbon_emissions {
+				IndexDomain: t;
+				Range: free;
+				Definition: q_gross(t)*Emissions_intensity-i(t)*A;
+			}
+		}
+		DeclarationSection Aux_cost_variables {
+			Variable ElectricitySalesRevenue {
+				IndexDomain: t;
+				Text: "Profit function";
+				Range: free;
+				Definition: {
+					q_net(t)*Price_electricity(t) !electricity sales revenue
+				}
+			}
+			Variable PlantFuelCost {
+				IndexDomain: t;
+				Text: "Profit function";
+				Range: free;
+				Definition: {
+					q_gross(t)*Thermal_efficiency*Price_gas(t) !plant fuel cost
+				}
+			}
+			Variable PlantCarbonEmissionsCost {
+				IndexDomain: t;
+				Text: "Profit function";
+				Range: free;
+				Definition: {
+					[q_gross(t)*Emissions_intensity*Price_carbon(t)-i(t)*A*(Price_carbon(t)-Cost_CO2_trans)] !plant cost of carbon emissions
+				}
+			}
+			Variable Plant_Varcost {
+				IndexDomain: t;
+				Text: "Profit function";
+				Range: free;
+				Definition: {
+					q_gross(t)*PlantVarcost !Plant varcost
+				}
+			}
+			Variable PlantCyclingCost {
+				IndexDomain: t;
+				Text: "Profit function";
+				Range: free;
+				Definition: {
+					(v(t)*StartupCost+z(t)*ShutdownCost) !plant cycling cost
+				}
+			}
+			Variable Objective_Function_HourlySteps {
+				IndexDomain: t;
+				Text: "Profit function";
+				Range: free;
+				Definition: {
+					ElectricitySalesRevenue(t)
+					
+					-PlantFuelCost(t)
+					
+					-PlantCarbonEmissionsCost(t)
+					
+					-Plant_Varcost(t)
+					
+					-PlantCyclingCost(t)
+				}
+			}
+			Variable Objective_Function_ALL {
+				Text: "Profit function";
+				Range: free;
+				Definition: sum(t,Objective_Function_HourlySteps(t));
+			}
+			Variable Objective_Function_2030 {
+				Text: "Profit function";
+				Range: free;
+				Definition: sum(t|ord(t)>=1 and ord(t)<=8760,Objective_Function_HourlySteps(t));
+			}
+			Variable Objective_Function_2040 {
+				Text: "Profit function";
+				Range: free;
+				Definition: sum(t|ord(t)>=8761 and ord(t)<=17544,Objective_Function_HourlySteps(t));
+			}
+			Variable Objective_Function_2050 {
+				Text: "Profit function";
+				Range: free;
+				Definition: sum(t|ord(t)>=17545 and ord(t)<=26304,Objective_Function_HourlySteps(t));
+			}
+		}
+	}
+	Section MODEL_CONSTRAINTS {
+		DeclarationSection CCS_and_solvent_storage_constraints {
+			Constraint Carbon_CaptureRate {
+				IndexDomain: t;
+				Definition: i(t)*A <= CapRate* q_gross(t)*Emissions_intensity;
+			}
+			Constraint Storage_max_volume {
+				IndexDomain: t;
+				Property: ShadowPrice;
+				Definition: storage_level(t) <= SolventTankVolume;
+			}
+			Constraint Storage_final {
+				IndexDomain: t | ord(t)=End_period;
+				Definition: storage_level(t) =0;
+			}
+			Constraint Rich_solvent {
+				IndexDomain: t;
+				Property: ShadowPrice;
+				Definition: i(t) <= MaxSolventFlow*q_gross(t);
+				Comment: {
+					"if this change to \"=\" then it will be fixed capture at 90% at all time; 
+					\"<=\" means variable capture up to 90% of emissions - it means it can vent flue gas and capture CO2 having less rich solvent"
+				}
+			}
+			Constraint Lean_solvent {
+				IndexDomain: t;
+				Property: ShadowPrice;
+				Definition: w(t) <= MaxSolventFlow *PlantCapacity;
+			}
+		}
+		DeclarationSection Thermal_generation {
+			Constraint Ramp_up {
+				IndexDomain: t | ord(t)<=card(t);
+				Text: "Ramp-up capability";
+				Definition: q_gross(t) - q_gross(t-1)$(ord(t)>1) - Q_INIT$(ord(t)=1) <= SU*(2-u(t) - u(t-1)$(ord(t)>1) - U_INIT$(ord(t)=1)) + RU*(1+u(t-1)$(ord(t)>1) + U_INIT$(ord(t)=1) -u(t));
+			}
+			Constraint Ramp_down {
+				IndexDomain: t |ord(t)<=card(t);
+				Text: "Ramp-down capability";
+				Definition: q_gross(t)$(ord(t)>1) + Q_INIT$(ord(t)=1) - q_gross(t) <= SD*(2-u(t) - u(t-1)$(ord(t)>1) - U_INIT$(ord(t)=1)) + RD*(1- u(t-1)$(ord(t)>1) -U_INIT$(ord(t)=1) +u(t));
+			}
+			Constraint Min_stable_gen {
+				IndexDomain: t;
+				Text: "Minimum stable generation";
+				Definition: q_gross(t) >= u(t)*P_min;
+			}
+			Constraint Max_output {
+				IndexDomain: t;
+				Text: "Maximum power generation";
+				Definition: q_gross(t) <= u(t)*P_max;
+			}
+		}
+		DeclarationSection Unit_commitment_constraints {
+			Constraint UC_Logical {
+				IndexDomain: t;
+				Text: "Logical constraint";
+				Definition: u(t)-u(t-1)$(t>1) -U_INIT$(ord(t)=Start_period) = v(t)-z(t);
+			}
+			Constraint UC_MinUTime2 {
+				IndexDomain: t | ord(t) >=1 and ord(t)<= card(t)-UT+1;
+				Text: "Minimum uptime requirements";
+				Definition: {
+					sum(tt$((ord(tt)>=ord(t)) and (ord(tt) <= (ord(t)+UT-1))),u(tt)) >= 
+					
+					UT*(u(t)-U_INIT$(ord(t) = 1)-u(t-1)$(ord(t) > 1))
+				}
+			}
+			Constraint UC_MinUTime3 {
+				IndexDomain: t | ord(t)>=card(t)-UT+2 and ord(t)<= card(t);
+				Text: "Minimum uptime requirements";
+				Definition: sum(tt$((ord(t) <= ord(tt)) and (ord(tt) <= card(t))),u(tt)-(u(t) -U_INIT$(ord(t)=1) -u(t-1)$(ord(t)>1))) >=0;
+				Comment: "sum(tt$((ord(t) <= ord(tt)) and (ord(tt) <= card(t))),u(tt)-(u(t)-U_INIT$(ord(t) = 1)-u(t-1)$(ord(t) > 1))) >=0";
+			}
+			Constraint UC_MinDTime2 {
+				IndexDomain: t |ord(t)>=1 and ord(t)<=(card(t)-DT+1);
+				Text: "Minimum downtime requirements - 3";
+				Definition: {
+					sum(tt$((ord(tt)>=ord(t)) and (ord(tt) <= (ord(t)+DT-1))),1-u(tt))
+					
+					>=
+					
+					DT*(U_INIT$(ord(t)=1)+u(t-1)$(ord(t)>1)-u(t))
+				}
+			}
+			Constraint UC_MinDTime3 {
+				IndexDomain: t | ord(t)>=card(t)-DT+2 and ord(t)<=card(t);
+				Text: "Minimum downtime requirements - 3";
+				Definition: {
+					sum(tt$((ord(tt)>=ord(t)) and (ord(tt) <=card(t))),1-u(tt)-(U_INIT$(ord(t)=1)+u(t-1)$(ord(t)>1)-u(t)))
+					>=
+					0
+				}
+			}
+		}
+	}
+	Section MODEL_FORMULATION {
+		MathematicalProgram Max_Obj_Function {
+			Objective: Objective_Function_ALL;
+			Direction: maximize;
+			Constraints: AllConstraints;
+			Variables: AllVariables;
+			Type: Automatic;
+		}
+		StringParameter Case_output;
+		StringParameter Sheet_output;
+		Procedure Initialization {
+			Body: {
+				empty CapRate, SolventTankVolume, U_INIT, Q_INIT;
+				
+				CapRate := 0.9;
+				SolventTankVolume := 3700;
+				U_INIT := 1;
+				Q_INIT := PlantCapacity;
+			}
+			Comment: {
+				"CapRate := 0.9;
+				SolventTankVolume := 3700;"
+			}
+		}
+		Procedure Data_import {
+			Body: {
+				Start_period := 1;
+				
+				End_period := 26304;
+				
+				Import_Electricity_projection;
+				
+				Import_NBP_CO2_projection;
+			}
+			Comment: {
+				"Start_period := 1  	End_period := 8760		2030
+				Start_period := 8761 	End_period := 17544		2040
+				Start_period := 17545 	End_period := 26304		2050"
+			}
+		}
+		Procedure Solving_the_model_LW {
+			Body: {
+				Price_electricity(t):=Pe_LW(t);
+				Price_gas(t):=Pg_BASE(t);
+				Price_carbon(t):=Pc_HIGH(t);
+				
+				solve Max_Obj_Function;
+			}
+		}
+		Procedure Solving_the_model_ST {
+			Body: {
+				Price_electricity(t):=Pe_ST(t);
+				Price_gas(t):=Pg_BASE(t);
+				Price_carbon(t):=Pc_BASE(t);
+				
+				solve Max_Obj_Function;
+			}
+			Comment: {
+				"Start_period := 1  	End_period := 8760		2030
+				Start_period := 8761 	End_period := 17544		2040
+				Start_period := 17545 	End_period := 26304		2050"
+			}
+		}
+		Procedure Export_results {
+			Body: {
+				 !empty q_output, i_output, w_output, u_output, s_output, Case_output, Sheet_output;
+				
+				   ! REPORT OPTIMAL VARIABLES IN OUTPUT SECTION
+				   	!q_output(t) := q_gross(t);
+				   	!i_output(t) := i(t);
+				   	!w_output(t) := w(t);
+				   	!u_output(t) := u(t);
+				   	!Profit_output(t) := (q_gross(t)-w(t)*B)*PeBASE(t) -q_gross(t)*PlantVarcost -LHV*cons_ngas(t)*Emissions_intensity*PcBASE(t) -cons_biomethane(t)*Price_biomethane -cons_ngas(t)*PgBASE(t) +i(t)*A*(PcBASE(t)-Cost_CO2_trans)-(v(t)*StartupCost+z(t)*ShutdownCost);
+					!s_output(t) := storage_level(t);
+				
+					Case_output := "Forecast BioCH4=35 without storage 20210119"; ! Excel file name 
+					Sheet_output := "2030 Base" ; ! Excel sheet
+				
+				  	Export_Output_to_Excel;
+			}
+		}
+		Procedure All_proc_edures {
+			Body: {
+				Initialization;
+				
+				Data_import;
+				
+				Solving_the_model_ST;
+			}
+		}
+	}
+	Section INPUT_DATA_PROCEDURES {
+		Section Import_prices {
+			DeclarationSection Aux_variables {
+				StringParameter SheetName_DAM;
+				StringParameter SheetName_NBP;
+				StringParameter SheetName_CO2;
+				StringParameter SheetName_Biomethane;
+				StringParameter WorkBookName_Prices;
+				StringParameter WorkBookName_Costings;
+				StringParameter SheetName_Options;
+				StringParameter SheetName_Tanks;
+			}
+			Procedure Import_Electricity_projection {
+				Body: {
+					empty Pe_LW, Pe_ST, Pe_CT, Pe_SP, WorkBookName_Prices, SheetName_DAM ;
+					
+					WorkBookName_Prices := "Data/Input_Electricity_Forecast - 2016 x 2 volatility - High.xlsx";
+					if axll::WorkBookIsOpen(WorkBookName_Prices) then
+					    axll::SelectWorkBook(WorkBookName_Prices);
+					else
+					    axll::OpenWorkBook(WorkBookName_Prices);
+					endif;
+					
+					SheetName_DAM := "Electricity";
+					axll::SelectSheet(SheetName_DAM);
+					
+					axll::ReadList(
+					    IdentifierReference :  Pe_LW(t),
+					    RowHeaderRange      :  FormatString("A%i:A%i", Start_period+1, End_period+1),
+					    DataRange           :  FormatString("C%i:C%i", Start_period+1, End_period+1));
+					
+					axll::ReadList(
+					    IdentifierReference :  Pe_ST(t),
+					    RowHeaderRange      :  FormatString("A%i:A%i", Start_period+1, End_period+1),
+					    DataRange           :  FormatString("D%i:D%i", Start_period+1, End_period+1));
+					
+					axll::ReadList(
+					    IdentifierReference :  Pe_CT(t),
+					    RowHeaderRange      :  FormatString("A%i:A%i", Start_period+1, End_period+1),
+					    DataRange           :  FormatString("E%i:E%i", Start_period+1, End_period+1));
+					
+					axll::ReadList(
+					    IdentifierReference :  Pe_SP(t),
+					    RowHeaderRange      :  FormatString("A%i:A%i", Start_period+1, End_period+1),
+					    DataRange           :  FormatString("F%i:F%i", Start_period+1, End_period+1));
+					
+					
+					axll::CloseWorkBook(WorkBookName_Prices);
+				}
+				Comment: {
+					"Start_period := 1  End_period := 8760		2030
+					Start_period := 8761 End_period := 17544	2040
+					Start_period := 17545 End_period := 26304	2050"
+				}
+			}
+			Procedure Import_NBP_CO2_projection {
+				Body: {
+					empty Pg_BASE, Pc_HIGH,Pc_BASE,Pc_LOW, WorkBookName_Prices, SheetName_NBP ,SheetName_CO2;
+					
+					WorkBookName_Prices := "Data/Input_NBP_CO2_Forecast - High.xlsx";
+					if axll::WorkBookIsOpen(WorkBookName_Prices) then
+					    axll::SelectWorkBook(WorkBookName_Prices);
+					else
+					    axll::OpenWorkBook(WorkBookName_Prices);
+					endif;
+					
+					SheetName_NBP := "NBP CO2";
+					axll::SelectSheet(SheetName_NBP);
+					
+					axll::ReadList(
+					    IdentifierReference :  Pg_BASE(t),
+					    RowHeaderRange      :  FormatString("A%i:A%i", Start_period+1, End_period+1),
+					    DataRange           :  FormatString("D%i:D%i", Start_period+1, End_period+1));
+					
+					axll::ReadList(
+					    IdentifierReference :  Pc_HIGH(t),
+					    RowHeaderRange      :  FormatString("A%i:A%i", Start_period+1, End_period+1),
+					    DataRange           :  FormatString("E%i:E%i", Start_period+1, End_period+1));
+					
+					axll::ReadList(
+					    IdentifierReference :  Pc_BASE(t),
+					    RowHeaderRange      :  FormatString("A%i:A%i", Start_period+1, End_period+1),
+					    DataRange           :  FormatString("F%i:F%i", Start_period+1, End_period+1));
+					
+					axll::ReadList(
+					    IdentifierReference :  Pc_LOW(t),
+					    RowHeaderRange      :  FormatString("A%i:A%i", Start_period+1, End_period+1),
+					    DataRange           :  FormatString("G%i:G%i", Start_period+1, End_period+1));
+					
+					
+					axll::CloseWorkBook(WorkBookName_Prices);
+				}
+				Comment: {
+					"Start_period := 1  End_period := 8760		2030
+					Start_period := 8761 End_period := 17544	2040
+					Start_period := 17545 End_period := 26304	2050"
+				}
+			}
+		}
+	}
+	Section OUTPUT_DATA_PROCEDURES {
+		DeclarationSection Results_CCS {
+			Parameter i_output {
+				IndexDomain: t;
+				Range: free;
+				Definition: i(t)*A;
+			}
+			Parameter w_output {
+				IndexDomain: t;
+				Range: free;
+			}
+			Parameter s_output {
+				IndexDomain: t;
+			}
+			Parameter CO2_capture_2030 {
+				IndexDomain: t|ord(t)>=1 and ord(t)<=8760;
+				Range: free;
+				Definition: i(t)*A;
+			}
+			Parameter CO2_capture_2040 {
+				IndexDomain: t|ord(t)>=8761 and ord(t)<=17544;
+				Range: free;
+				Definition: i(t)*A;
+			}
+			Parameter CO2_capture_2050 {
+				IndexDomain: t|ord(t)>=17545 and ord(t)<=26304;
+				Range: free;
+				Definition: i(t)*A;
+			}
+			Parameter CO2_capture_2030_Annual {
+				Range: free;
+				Definition: sum(t,CO2_capture_2030(t))/1000;
+				Comment: "ktCO2";
+			}
+			Parameter CO2_capture_2040_Annual {
+				Range: free;
+				Definition: sum(t,CO2_capture_2040(t))/1000;
+				Comment: "ktco2";
+			}
+			Parameter CO2_capture_2050_Annual {
+				Range: free;
+				Definition: sum(t,CO2_capture_2050(t))/1000;
+				Comment: "ktco2";
+			}
+			Parameter CO2_StorageLevel_2030 {
+				IndexDomain: t|ord(t)>=1 and ord(t)<=8760;
+				Range: free;
+				Definition: storage_level(t);
+			}
+			Parameter CO2_StorageLevel_2040 {
+				IndexDomain: t|ord(t)>=8761 and ord(t)<=17544;
+				Range: free;
+				Definition: storage_level(t);
+			}
+			Parameter CO2_StorageLevel_2050 {
+				IndexDomain: t|ord(t)>=17545 and ord(t)<=26304;
+				Range: free;
+				Definition: storage_level(t);
+			}
+		}
+		DeclarationSection Results_Dispatch {
+			Parameter q_output {
+				IndexDomain: t;
+				Range: free;
+			}
+			Parameter u_output {
+				IndexDomain: t;
+			}
+			Parameter Gross_Generation_2030 {
+				IndexDomain: t|ord(t)>=1 and ord(t)<=8760;
+				Range: free;
+				Definition: q_gross(t);
+			}
+			Parameter Gross_Generation_2040 {
+				IndexDomain: t|ord(t)>=8761 and ord(t)<=17544;
+				Range: free;
+				Definition: q_gross(t);
+			}
+			Parameter Gross_Generation_2050 {
+				IndexDomain: t|ord(t)>=17545 and ord(t)<=26304;
+				Range: free;
+				Definition: q_gross(t);
+			}
+			Parameter Gross_Generation_2030_Annual {
+				Range: free;
+				Definition: sum(t,Gross_Generation_2030(t))/1000;
+				Comment: "GWh";
+			}
+			Parameter Gross_Generation_2040_Annual {
+				Range: free;
+				Definition: sum(t,Gross_Generation_2040(t))/1000;
+				Comment: "GWh";
+			}
+			Parameter Gross_Generation_2050_Annual {
+				Range: free;
+				Definition: sum(t,Gross_Generation_2050(t))/1000;
+				Comment: "GWh";
+			}
+			Parameter Net_Sales_2030 {
+				IndexDomain: t|ord(t)>=1 and ord(t)<=8760;
+				Range: free;
+				Definition: q_net(t);
+			}
+			Parameter Net_Sales_2040 {
+				IndexDomain: t|ord(t)>=8761 and ord(t)<=17544;
+				Range: free;
+				Definition: q_net(t);
+			}
+			Parameter Net_Sales_2050 {
+				IndexDomain: t|ord(t)>=17545 and ord(t)<=26304;
+				Range: free;
+				Definition: q_net(t);
+			}
+			Parameter Net_Sales_2030_Annual {
+				Range: free;
+				Definition: sum(t,Net_Sales_2030(t))/1000;
+				Comment: "GWh";
+			}
+			Parameter Net_Sales_2040_Annual {
+				Range: free;
+				Definition: sum(t,Net_Sales_2040(t))/1000;
+				Comment: "GWh";
+			}
+			Parameter Net_Sales_2050_Annual {
+				Range: free;
+				Definition: sum(t,Net_Sales_2050(t))/1000;
+				Comment: "GWh";
+			}
+			Parameter PlantCommitments_2030 {
+				IndexDomain: t|ord(t)>=1 and ord(t)<=8760;
+				Definition: u(t);
+			}
+			Parameter PlantCommitments_2040 {
+				IndexDomain: t|ord(t)>=8761 and ord(t)<=17544;
+				Range: free;
+				Definition: u(t);
+			}
+			Parameter PlantCommitments_2050 {
+				IndexDomain: t|ord(t)>=17545 and ord(t)<=26304;
+				Range: free;
+				Definition: u(t);
+			}
+			Parameter TotalCommitments_2030_Annual {
+				Range: free;
+				Definition: sum(t,PlantCommitments_2030(t));
+			}
+			Parameter TotalCommitments_2040_Annual {
+				Range: free;
+				Definition: sum(t,PlantCommitments_2040(t));
+			}
+			Parameter TotalCommitments_2050_Annual {
+				Range: free;
+				Definition: sum(t,PlantCommitments_2050(t));
+			}
+			Parameter Gross_Generation_atSMG_2030 {
+				IndexDomain: t|ord(t)>=1 and ord(t)<=8760;
+				Range: free;
+				Definition: {
+					if Round(Gross_Generation_2030(t),3)=P_min then 1 else 0 endif;
+				}
+			}
+			Parameter Gross_Generation_atSMG_2040 {
+				IndexDomain: t|ord(t)>=8761 and ord(t)<=17544;
+				Range: free;
+				Definition: {
+					if Round(Gross_Generation_2040(t),3)=P_min then 1 else 0 endif;
+				}
+			}
+			Parameter Gross_Generation_atSMG_2050 {
+				IndexDomain: t|ord(t)>=17545 and ord(t)<=26304;
+				Range: free;
+				Definition: {
+					if Round(Gross_Generation_2050(t),3)=P_min then 1 else 0 endif;
+				}
+			}
+			Parameter Gross_Generation_atSMG_2030_Annual {
+				Range: free;
+				Definition: sum(t,Gross_Generation_atSMG_2030(t));
+			}
+			Parameter Gross_Generation_atSMG_2040_Annual {
+				Range: free;
+				Definition: sum(t,Gross_Generation_atSMG_2040(t));
+			}
+			Parameter Gross_Generation_atSMG_2050_Annual {
+				Range: free;
+				Definition: sum(t,Gross_Generation_atSMG_2050(t));
+			}
+		}
+		DeclarationSection Input_Prices_Costs {
+			Parameter Price_electricity_2030 {
+				IndexDomain: t|ord(t)>=1 and ord(t)<=8760;
+				Text: "Price electricity £/MWh";
+				Range: free;
+				Definition: Price_electricity(t);
+			}
+			Parameter Price_electricity_2040 {
+				IndexDomain: t;
+				Text: "Price electricity £/MWh";
+				Range: free;
+				Definition: Price_electricity(t);
+				Comment: "|ord(t)>=8761 and ord(t)<=17544";
+			}
+			Parameter Price_electricity_2050 {
+				IndexDomain: t;
+				Text: "Price electricity £/MWh";
+				Range: free;
+				Definition: Price_electricity(t);
+				Comment: "|ord(t)>=17545 and ord(t)<=26304";
+			}
+			Parameter Price_gas_2030 {
+				IndexDomain: t|ord(t)>=1 and ord(t)<=8760;
+				Text: "Price gas £/MWh";
+				Range: free;
+				Definition: Price_gas(t);
+			}
+			Parameter Price_gas_2040 {
+				IndexDomain: t|ord(t)>=8761 and ord(t)<=17544;
+				Text: "Price gas £/MWh";
+				Range: free;
+				Definition: Price_gas(t);
+			}
+			Parameter Price_gas_2050 {
+				IndexDomain: t|ord(t)>=17545 and ord(t)<=26304;
+				Text: "Price gas £/MWh";
+				Range: free;
+				Definition: Price_gas(t);
+			}
+			Parameter Price_carbon_2030 {
+				IndexDomain: t|ord(t)>=1 and ord(t)<=8760;
+				Text: "Price carbon £/MWh";
+				Range: free;
+				Definition: Price_carbon(t);
+			}
+			Parameter Price_carbon_2040 {
+				IndexDomain: t|ord(t)>=8761 and ord(t)<=17544;
+				Text: "Price carbon £/MWh";
+				Range: free;
+				Definition: Price_carbon(t);
+			}
+			Parameter Price_carbon_2050 {
+				IndexDomain: t|ord(t)>=17545 and ord(t)<=26304;
+				Text: "Price carbon £/MWh";
+				Range: free;
+				Definition: Price_carbon(t);
+			}
+			Parameter AverageElecPrice_2030 {
+				Definition: average(t|ord(t)>=1 and ord(t)<=8760,Price_electricity_2030(t));
+				Comment: "Start_period := 1  	End_period := 8760		2030";
+			}
+			Parameter AverageElecPrice_2040 {
+				Definition: average(t|ord(t)>=8761 and ord(t)<=17544,Price_electricity_2040(t));
+			}
+			Parameter AverageElecPrice_2050 {
+				Definition: average(t|ord(t)>=17545 and ord(t)<=26304,Price_electricity_2050(t));
+			}
+			Parameter CV_ElecPrice_2030 {
+				Definition: sampledeviation(t|ord(t)>=1 and ord(t)<=8760, Price_electricity_2030(t))/AverageElecPrice_2030;
+				Comment: "Start_period := 1  	End_period := 8760		2030";
+			}
+			Parameter CV_ElecPrice_2040 {
+				Definition: sampledeviation(t|ord(t)>=8761 and ord(t)<=17544, Price_electricity_2040(t))/AverageElecPrice_2040;
+			}
+			Parameter CV_ElecPrice_2050 {
+				Definition: sampledeviation(t|ord(t)>=17545 and ord(t)<=26304, Price_electricity_2050(t))/AverageElecPrice_2050;
+			}
+			Parameter AverageGasPrice_2030 {
+				Definition: average(t|ord(t)>=1 and ord(t)<=8760,Price_gas_2030(t));
+				Comment: "Start_period := 1  	End_period := 8760		2030";
+			}
+			Parameter AverageGasPrice_2040 {
+				Definition: average(t|ord(t)>=8761 and ord(t)<=17544,Price_gas_2040(t));
+				Comment: "Start_period := 1  	End_period := 8760		2030";
+			}
+			Parameter AverageGasPrice_2050 {
+				Definition: average(t|ord(t)>=17545 and ord(t)<=26304,Price_gas_2050(t));
+				Comment: "Start_period := 1  	End_period := 8760		2030";
+			}
+			Parameter CV_GasPrice_2030 {
+				Definition: sampledeviation(t|ord(t)>=1 and ord(t)<=8760, Price_gas_2030(t))/AverageGasPrice_2030;
+				Comment: "Start_period := 1  	End_period := 8760		2030";
+			}
+			Parameter CV_GasPrice_2040 {
+				Definition: sampledeviation(t|ord(t)>=8761 and ord(t)<=17544, Price_gas_2040(t))/AverageGasPrice_2040;
+				Comment: "Start_period := 1  	End_period := 8760		2030";
+			}
+			Parameter CV_GasPrice_2050 {
+				Definition: sampledeviation(t|ord(t)>=17545 and ord(t)<=26304, Price_gas_2050(t))/AverageGasPrice_2050;
+				Comment: "Start_period := 1  	End_period := 8760		2030";
+			}
+			Parameter AverageCarbonPrice_2030 {
+				Definition: average(t|ord(t)>=1 and ord(t)<=8760,Price_carbon_2030(t));
+				Comment: "Start_period := 1  	End_period := 8760		2030";
+			}
+			Parameter AverageCarbonPrice_2040 {
+				Definition: average(t|ord(t)>=8761 and ord(t)<=17544,Price_carbon_2040(t));
+				Comment: "Start_period := 1  	End_period := 8760		2030";
+			}
+			Parameter AverageCarbonPrice_2050 {
+				Definition: average(t|ord(t)>=17545 and ord(t)<=26304,Price_carbon_2050(t));
+				Comment: "Start_period := 1  	End_period := 8760		2030";
+			}
+			Parameter CV_CarbonPrice_2030 {
+				Definition: sampledeviation(t|ord(t)>=1 and ord(t)<=8760, Price_carbon_2030(t))/AverageCarbonPrice_2030;
+				Comment: "Start_period := 1  	End_period := 8760		2030";
+			}
+			Parameter CV_CarbonPrice_2040 {
+				Definition: sampledeviation(t|ord(t)>=8761 and ord(t)<=17544, Price_carbon_2040(t))/AverageCarbonPrice_2040;
+				Comment: "Start_period := 1  	End_period := 8760		2030";
+			}
+			Parameter CV_CarbonPrice_2050 {
+				Definition: sampledeviation(t|ord(t)>=17545 and ord(t)<=26304, Price_carbon_2050(t))/AverageCarbonPrice_2050;
+				Comment: "Start_period := 1  	End_period := 8760		2030";
+			}
+			Parameter CleanSparkSpread_2030 {
+				IndexDomain: t|ord(t)>=1 and ord(t)<=8760;
+				Text: "Price electricity £/MWh";
+				Range: free;
+				Definition: Price_electricity_2030(t)-Thermal_efficiency*Price_gas(t) - Emissions_intensity*Price_carbon(t);
+			}
+			Parameter CleanSparkSpread_2040 {
+				IndexDomain: t|ord(t)>=8761 and ord(t)<=17544;
+				Text: "Price electricity £/MWh";
+				Range: free;
+				Definition: Price_electricity_2040(t)-Thermal_efficiency*Price_gas(t) - Emissions_intensity*Price_carbon(t);
+			}
+			Parameter CleanSparkSpread_2050 {
+				IndexDomain: t|ord(t)>=17545 and ord(t)<=26304;
+				Text: "Price electricity £/MWh";
+				Range: free;
+				Definition: Price_electricity_2050(t)-Thermal_efficiency*Price_gas(t) - Emissions_intensity*Price_carbon(t);
+			}
+			Parameter CleanSparkSpread_Unabated_ALL {
+				IndexDomain: t;
+				Text: "Price electricity £/MWh";
+				Range: free;
+				Definition: Price_electricity_2030(t)-Thermal_efficiency*Price_gas(t) - Emissions_intensity*Price_carbon(t);
+			}
+			Parameter CleanSparkSpread_CCS_ALL {
+				IndexDomain: t;
+				Text: "Price electricity £/MWh";
+				Range: free;
+				Definition: Price_electricity_2030(t)-Thermal_efficiency*Price_gas(t) - 0.1*Emissions_intensity*Price_carbon(t);
+			}
+			Parameter AverageCleanSparkSpread_2030 {
+				Range: free;
+				Definition: average(t,CleanSparkSpread_2030(t));
+			}
+			Parameter AverageCleanSparkSpread_2040 {
+				Range: free;
+				Definition: average(t,CleanSparkSpread_2040(t));
+			}
+			Parameter AverageCleanSparkSpread_2050 {
+				Range: free;
+				Definition: average(t,CleanSparkSpread_2050(t));
+			}
+		}
+		DeclarationSection Output_Profits {
+			Parameter ObjectiveFunction_2030_Hourly {
+				IndexDomain: t|ord(t)>=1 and ord(t)<=8760;
+				Definition: Objective_Function_HourlySteps(t);
+				Comment: "Start_period := 1  	End_period := 8760		2030";
+			}
+			Parameter ObjectiveFunction_2040_Hourly {
+				IndexDomain: t|ord(t)>=8761 and ord(t)<=17544;
+				Definition: Objective_Function_HourlySteps(t);
+			}
+			Parameter ObjectiveFunction_2050_Hourly {
+				IndexDomain: t|ord(t)>=17545 and ord(t)<=26304;
+				Definition: Objective_Function_HourlySteps(t);
+			}
+			Parameter ObjectiveFunction_2030_Annual {
+				Definition: sum(t,ObjectiveFunction_2030_Hourly(t))/1000000;
+				Comment: "in £M";
+			}
+			Parameter ObjectiveFunction_2040_Annual {
+				Definition: sum(t,ObjectiveFunction_2040_Hourly(t))/1000000;
+				Comment: "Start_period := 1  	End_period := 8760		2030";
+			}
+			Parameter ObjectiveFunction_2050_Annual {
+				Definition: sum(t,ObjectiveFunction_2050_Hourly(t))/1000000;
+				Comment: "Start_period := 1  	End_period := 8760		2030";
+			}
+			Parameter AverageAllProfit_2030 {
+				Definition: average(t|ord(t)>=1 and ord(t)<=8760,ObjectiveFunction_2030_Hourly(t));
+				Comment: "Start_period := 1  	End_period := 8760		2030";
+			}
+			Parameter AverageAllProfit_2040 {
+				Definition: average(t|ord(t)>=8761 and ord(t)<=17544,ObjectiveFunction_2040_Hourly(t));
+			}
+			Parameter AverageAllProfit_2050 {
+				Definition: average(t|ord(t)>=17545 and ord(t)<=26304,ObjectiveFunction_2050_Hourly(t));
+			}
+			Parameter MinAllProfit_2030 {
+				Definition: Min(t|ord(t)>=1 and ord(t)<=8760,ObjectiveFunction_2030_Hourly(t));
+				Comment: "Start_period := 1  	End_period := 8760		2030";
+			}
+			Parameter MinAllProfit_2040 {
+				Definition: Min(t|ord(t)>=8761 and ord(t)<=17544,ObjectiveFunction_2040_Hourly(t));
+				Comment: "Start_period := 8761 End_period := 17544	2040";
+			}
+			Parameter MinAllProfit_2050 {
+				Definition: min(t,ObjectiveFunction_2050_Hourly(t));
+				Comment: "|ord(t)>=17545 and ord(t)<=26304,";
+			}
+			Parameter MaxAllProfit_2030 {
+				Definition: max(t|ord(t)>=1 and ord(t)<=8760,ObjectiveFunction_2030_Hourly(t));
+				Comment: "Start_period := 1  	End_period := 8760		2030";
+			}
+			Parameter MaxAllProfit_2040 {
+				Definition: max(t|ord(t)>=8761 and ord(t)<=17544,ObjectiveFunction_2040_Hourly(t));
+				Comment: "Start_period := 8761 End_period := 17544	2040";
+			}
+			Parameter MaxAllProfit_2050 {
+				Definition: max(t|ord(t)>=17545 and ord(t)<=26304,ObjectiveFunction_2050_Hourly(t));
+			}
+			Parameter CV_AllProfit_2030 {
+				Definition: sampledeviation(t|ord(t)>=1 and ord(t)<=8760, ObjectiveFunction_2030_Hourly(t))/AverageAllProfit_2030;
+				Comment: "Start_period := 1  	End_period := 8760		2030";
+			}
+			Parameter CV_AllProfit_2040 {
+				Definition: {
+					!sampledeviation(t|ord(t)>=8761 and ord(t)<=17544, ObjectiveFunction_2040_Hourly(t))/AverageAllProfit_2040
+				}
+			}
+			Parameter CV_AllProfit_2050 {
+				Definition: sampledeviation(t|ord(t)>=17545 and ord(t)<=26304, ObjectiveFunction_2050_Hourly(t))/AverageAllProfit_2050;
+			}
+			Parameter AveragePeakProfit_2030 {
+				Definition: average(t|ord(t)>=1 and ord(t)<=8760 and PeakPeriods(t)=1,ObjectiveFunction_2030_Hourly(t));
+				Comment: "Start_period := 1  	End_period := 8760		2030";
+			}
+			Parameter AveragePeakProfit_2040 {
+				Definition: average(t|ord(t)>=8761 and ord(t)<=17544 and PeakPeriods(t)=1,ObjectiveFunction_2040_Hourly(t));
+				Comment: "Start_period := 8761 End_period := 17544	2040";
+			}
+			Parameter AveragePeakProfit_2050 {
+				Definition: average(t|ord(t)>=17545 and ord(t)<=26304 and PeakPeriods(t)=1,ObjectiveFunction_2050_Hourly(t));
+			}
+			Parameter Revenue_2030_Annual {
+				Definition: sum(t|ord(t)>=1 and ord(t)<=8760,ElectricitySalesRevenue(t))/1000000;
+				Comment: "in £M";
+			}
+			Parameter Revenue_2040_Annual {
+				Definition: sum(t|ord(t)>=8761 and ord(t)<=17544,ElectricitySalesRevenue(t))/1000000;
+				Comment: "in £M";
+			}
+			Parameter Revenue_2050_Annual {
+				Definition: sum(t|ord(t)>=17545 and ord(t)<=26304,ElectricitySalesRevenue(t))/1000000;
+				Comment: "in £M";
+			}
+			Parameter TotalCost_2030_Annual {
+				Definition: {
+					PlantFuelCost_2030_Annual+
+					PlantCarbonCost_2030_Annual+
+					PlantVarCost_2030_Annual+
+					PlantCyclingCost_2030_Annual
+				}
+				Comment: "in £M";
+			}
+			Parameter TotalCost_2040_Annual {
+				Definition: {
+					PlantFuelCost_2040_Annual+
+					PlantCarbonCost_2040_Annual+
+					PlantVarCost_2040_Annual+
+					PlantCyclingCost_2040_Annual
+				}
+				Comment: "in £M";
+			}
+			Parameter TotalCost_2050_Annual {
+				Definition: {
+					PlantFuelCost_2050_Annual+
+					PlantCarbonCost_2050_Annual+
+					PlantVarCost_2050_Annual+
+					PlantCyclingCost_2050_Annual
+				}
+				Comment: "in £M";
+			}
+			Parameter PlantFuelCost_2030_Annual {
+				Definition: sum(t|ord(t)>=1 and ord(t)<=8760,PlantFuelCost(t))/1000000;
+				Comment: "in £M";
+			}
+			Parameter PlantFuelCost_2040_Annual {
+				Definition: sum(t|ord(t)>=8761 and ord(t)<=17544,PlantFuelCost(t))/1000000;
+				Comment: "in £M";
+			}
+			Parameter PlantFuelCost_2050_Annual {
+				Definition: sum(t|ord(t)>=17545 and ord(t)<=26304,PlantFuelCost(t))/1000000;
+				Comment: "in £M";
+			}
+			Parameter PlantCarbonCost_2030_Annual {
+				Definition: sum(t|ord(t)>=1 and ord(t)<=8760,PlantCarbonEmissionsCost(t))/1000000;
+				Comment: "in £M";
+			}
+			Parameter PlantCarbonCost_2040_Annual {
+				Definition: sum(t|ord(t)>=8761 and ord(t)<=17544,PlantCarbonEmissionsCost(t))/1000000;
+				Comment: "in £M";
+			}
+			Parameter PlantCarbonCost_2050_Annual {
+				Definition: sum(t|ord(t)>=17545 and ord(t)<=26304,PlantCarbonEmissionsCost(t))/1000000;
+				Comment: "in £M";
+			}
+			Parameter PlantVarCost_2030_Annual {
+				Definition: sum(t|ord(t)>=1 and ord(t)<=8760,Plant_Varcost(t))/1000000;
+				Comment: "in £M";
+			}
+			Parameter PlantVarCost_2040_Annual {
+				Definition: sum(t|ord(t)>=8761 and ord(t)<=17544,Plant_Varcost(t))/1000000;
+				Comment: "in £M";
+			}
+			Parameter PlantVarCost_2050_Annual {
+				Definition: sum(t|ord(t)>=17545 and ord(t)<=26304,Plant_Varcost(t))/1000000;
+				Comment: "in £M";
+			}
+			Parameter PlantCyclingCost_2030_Annual {
+				Definition: sum(t|ord(t)>=1 and ord(t)<=8760,PlantCyclingCost(t))/1000000;
+				Comment: "in £M";
+			}
+			Parameter PlantCyclingCost_2040_Annual {
+				Definition: sum(t|ord(t)>=8761 and ord(t)<=17544,PlantCyclingCost(t))/1000000;
+				Comment: "in £M";
+			}
+			Parameter PlantCyclingCost_2050_Annual {
+				Definition: sum(t|ord(t)>=17545 and ord(t)<=26304,PlantCyclingCost(t))/1000000;
+				Comment: "in £M";
+			}
+		}
+		Section Export_to_Excel {
+			Procedure Export_Output_to_Excel {
+				Body: {
+					empty ExcelOutputFile, SheetOutputFile;
+					
+					ExcelOutputFile:=FormatString("Output/Results %s.xlsx",Case_output);
+					SheetOutputFile:=FormatString("%s",Sheet_output);
+					
+					ExcelClearRange(
+					        ExcelWorkbook: ExcelOutputFile,               ! (input) scalar string expression
+					        Range: "A2:AZ900000",                  ! (input) scalar string expression
+					        Sheet: SheetOutputFile,                ! (optional) scalar string expression
+					        );
+					
+					! Net electricity output
+					ExcelAssignTable (ExcelWorkbook: ExcelOutputFile,
+					                  Parameter    : q_output(t),
+					                  DataRange    : "B2:B900000",
+					                  RowsRange    : "A2:A900000",
+					                  RowMode: 1,
+					                  Columnmode   : 3,
+					                  Sheet        : SheetOutputFile,
+					                  ); 
+					
+					! Rich solvent flow
+					ExcelAssignTable (ExcelWorkbook: ExcelOutputFile,
+					                  Parameter    : i_output(t),
+					                  DataRange    : "E2:E900000",
+					                  RowsRange    : "D2:D900000",
+					                  RowMode: 1,
+					                  Columnmode   : 3,
+					                  Sheet        : SheetOutputFile,
+					                  ); 
+					
+					! Lean solvent flow
+					ExcelAssignTable (ExcelWorkbook: ExcelOutputFile,
+					                  Parameter    : w_output(t),
+					                  DataRange    : "H2:H900000",
+					                  RowsRange    : "G2:G900000",
+					                  RowMode: 1,
+					                  Columnmode   : 3,
+					                  Sheet        : SheetOutputFile,
+					                  ); 
+					
+					! Instantaneous profit
+					!ExcelAssignTable (ExcelWorkbook: ExcelOutputFile,
+					!                  Parameter    : Profit_output(t),
+					!                  DataRange    : "K2:K900000",
+					!                  RowsRange    : "J2:J900000",
+					!                  RowMode: 1,
+					!                  Columnmode   : 3,
+					!                  Sheet        : SheetOutputFile,
+					!                  ); 
+					
+					! On/off status of the plant
+					ExcelAssignTable (ExcelWorkbook: ExcelOutputFile,
+					                  Parameter    : u_output(t),
+					                  DataRange    : "N2:N900000",
+					                  RowsRange    : "M2:M900000",
+					                  RowMode: 1,
+					                  Columnmode   : 3,
+					                  Sheet        : SheetOutputFile,
+					                  );
+					
+					! Storage level
+					ExcelAssignTable (ExcelWorkbook: ExcelOutputFile,
+					                  Parameter    : s_output(t),
+					                  DataRange    : "Q2:Q900000",
+					                  RowsRange    : "P2:P900000",
+					                  RowMode: 1,
+					                  Columnmode   : 3,
+					                  Sheet        : SheetOutputFile,
+					                  );
+					
+					! Consumption of biomethane
+					!ExcelAssignTable (ExcelWorkbook: ExcelOutputFile,
+					!                  Parameter    : biomethane_output(t),
+					!                  DataRange    : "T2:T900000",
+					!                  RowsRange    : "S2:S900000",
+					!                  RowMode: 1,
+					!                  Columnmode   : 3,
+					!                  Sheet        : SheetOutputFile,
+					!                  );
+					
+					! Consumption of natural gas
+					!ExcelAssignTable (ExcelWorkbook: ExcelOutputFile,
+					!                  Parameter    : ngas_output(t),
+					!                  DataRange    : "W2:W900000",
+					!                  RowsRange    : "V2:V900000",
+					!                  RowMode: 1,
+					!                  Columnmode   : 3,
+					!                  Sheet        : SheetOutputFile,
+					!                  );
+					
+					! Shadow price Vol storage 
+					!ExcelAssignTable (ExcelWorkbook: ExcelOutputFile,
+					!                  Parameter    : Shadow_price_Vol(t),
+					!                  DataRange    : "Z2:Z900000",
+					!                  RowsRange    : "Y2:Y900000",
+					!                  RowMode: 1,
+					!                  Columnmode   : 3,
+					!                  Sheet        : SheetOutputFile,
+					!                  );
+					
+					! Shadow price Rich solvent 
+					!ExcelAssignTable (ExcelWorkbook: ExcelOutputFile,
+					!                  Parameter    : Shadow_price_Rich(t),
+					!                  DataRange    : "AC2:AC900000",
+					!                  RowsRange    : "AB2:AB900000",
+					!                  RowMode: 1,
+					!                  Columnmode   : 3,
+					!                  Sheet        : SheetOutputFile,
+					!                  );  
+					
+					! Shadow price Lean solvent 
+					!ExcelAssignTable (ExcelWorkbook: ExcelOutputFile,
+					!                  Parameter    : Shadow_price_Lean(t),
+					!                  DataRange    : "AF2:AF900000",
+					!                  RowsRange    : "AE2:AE900000",
+					!                  RowMode: 1,
+					!                  Columnmode   : 3,
+					!                  Sheet        : SheetOutputFile,
+					!                  );
+				}
+				StringParameter ExcelOutputFile;
+				StringParameter SheetOutputFile;
+			}
+		}
+	}
+	Section Quantities_and_Units {
+		Comment: {
+			"This section contains all the units and quantities that are added automatically by AIMMS.
+			It is recommended to declare all your quantities here."
+		}
+		Quantity SI_Time_Duration {
+			BaseUnit: s;
+			Conversions: minute->s : #-># * 60;
+			Comment: {
+				"Expresses the value for the duration of periods.
+				
+				The unit s has been added automatically because it is a required unit for AimmsWebUI.
+				
+				The unit minute has been added automatically because it is a required unit for AimmsWebUI."
+			}
+		}
+	}
+}

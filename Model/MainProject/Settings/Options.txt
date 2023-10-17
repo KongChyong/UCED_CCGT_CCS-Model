@@ -1,0 +1,17 @@
+﻿* AIMMS
+MIP_relative_optimality_tolerance 0.001
+* AOA
+* CBC 2.9
+* CONOPT 4.1
+* CPLEX 20.1
+"CPLEX 20.1".LP_method 4
+"CPLEX 20.1".solution_type 2
+* CPOptimizer 20.1
+* GUROBI 9.5
+* IPOPT 3.11
+* MINOS
+* ODH-CPLEX 5.3
+* PATH 4.7
+* SNOPT 7.2
+* NETSOL
+* Environment

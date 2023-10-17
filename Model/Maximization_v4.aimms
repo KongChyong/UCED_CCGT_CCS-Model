@@ -1,0 +1,10 @@
+<?xml version="1.0"?>
+<References AIMMS_Version="4.84.4.4 (x64)">
+	<MainProject Path="MainProject" />
+	<Library System="true" Path="AimmsPro" />
+	<Library System="true" Path="AimmsWebUI" />
+	<RepositoryLibrary UUID="E26C298C-5EF6-42C5-B7B7-59ED3DF48D6F" Name="AimmsXLLibrary" Version="1.1.0.8" />
+	<RepositoryLibrary UUID="2A0BB6B2-D999-41B4-A0DD-71100DA17577" Name="DataLink" Version="1.1.1.7" />
+	<RepositoryLibrary UUID="E44621C9-00BD-407F-BDD7-3E5AC74D2A94" Name="XLSProvider" Version="1.1.1.7" />
+	<RepositoryLibrary UUID="BE67716B-235F-471A-9360-487BACF9995A" Name="CSVProvider" Version="1.1.1.7" />
+</References>
